@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Olevia Roleplay – Routenplaner</title>
+<style>
+:root{color-scheme:dark;--bg:#10151d;--panel:#19222e;--line:#344253;--accent:#65d6a3;--text:#eef4f8;--muted:#9fb0c0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 20px;background:#141c26;border-bottom:1px solid var(--line);flex-wrap:wrap}
+h1{font-size:20px;margin:0}header p{margin:3px 0 0;color:var(--muted);font-size:13px}
+main{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 74px)}
+aside{padding:16px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:16px}
+.section{border-bottom:1px solid var(--line);padding-bottom:14px}.section:last-child{border:0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+button{border:1px solid #435568;background:#263444;color:var(--text);padding:9px 11px;border-radius:8px;cursor:pointer;font-weight:600}
+button:hover{border-color:var(--accent)}button.primary{background:var(--accent);border-color:var(--accent);color:#102018}
+.controls{display:flex;gap:7px;flex-wrap:wrap}.controls button{flex:1}
+label{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:10px 0;color:#d9e2e9;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--accent)}input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:#111923;color:var(--text)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat div{background:#111923;border:1px solid var(--line);border-radius:10px;padding:10px}.stat strong{font-size:21px;display:block}.stat span{font-size:11px;color:var(--muted)}
+.progress{height:7px;border-radius:8px;background:#0c1117;overflow:hidden;margin-top:9px}.progress span{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.hint{font-size:12px;color:var(--muted);margin:8px 0 0}.legend{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin:7px 0}.swatch{width:14px;height:14px;border:1px solid #d4e1e9;background:rgba(255,255,255,.04)}.swatch.done{background:rgba(101,214,163,.72);border-color:var(--accent)}
+.map-area{padding:14px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.map-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.map-toolbar small{color:var(--muted)}
+.viewport{position:relative;flex:1;min-height:500px;background:#0a1118;border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:grab;touch-action:none}
+.viewport.dragging{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.world img{display:block;width:1152px;height:1312px;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.grid{position:absolute;inset:0;display:grid;pointer-events:auto}
+.cell{border:1px solid rgba(18,37,47,.58);background:rgba(255,255,255,.035);min-width:0;min-height:0;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:rgba(10,28,36,.82);font-size:clamp(6px,.72vw,11px);font-weight:800;text-shadow:0 1px 0 rgba(255,255,255,.38);overflow:hidden}
+.cell:hover{background:rgba(255,255,255,.18);outline:1px solid rgba(255,255,255,.8);outline-offset:-1px}
+.cell.done{background:rgba(54,197,132,.72);border-color:rgba(14,93,59,.85);color:#063d28;text-shadow:0 1px 0 rgba(255,255,255,.28)}
+.cell.done:hover{background:rgba(54,197,132,.72)}
+.toast{position:absolute;bottom:12px;left:12px;background:rgba(10,17,24,.88);padding:8px 10px;border-radius:8px;font-size:12px;color:var(--muted);pointer-events:none}
+@media(max-width:800px){main{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr}.section{min-width:0}.viewport{min-height:60vh}.map-area{padding:10px}}
+@media(max-width:480px){aside{grid-template-columns:1fr}header{padding:13px}h1{font-size:18px}}
+</style>
+</head>
+<body>
+<header><div><h1>Olevia Roleplay · Routenplaner</h1><p>Deine Karte · GTA-Blöcke abhaken und Fortschritt speichern</p></div><div class="controls"><button id="resetView">Ansicht zurücksetzen</button><button id="export">Fortschritt exportieren</button></div></header>
+<main>
+<aside>
+  <section class="section">
+    <h2>Fortschritt</h2>
+    <div class="stat"><div><strong id="visited">0</strong><span>Besuchte Blöcke</span></div><div><strong id="total">0</strong><span>Blöcke gesamt</span></div></div>
+    <div class="progress"><span id="progressBar"></span></div>
+    <p class="hint" id="percent">0 % erledigt</p>
+  </section>
+  <section class="section">
+    <h2>Raster einstellen</h2>
+    <label for="cols">Spalten <strong id="colsVal">24</strong></label><input id="cols" type="range" min="12" max="64" value="24">
+    <label for="rows">Zeilen <strong id="rowsVal">28</strong></label><input id="rows" type="range" min="12" max="72" value="28">
+    <p class="hint">Passe die Anzahl an, bis ein Kästchen ungefähr einem GTA-Straßenblock entspricht. Bereits abgehakte Felder bleiben beim Ändern der Rastergröße separat gespeichert, soweit sie noch passen.</p>
+    <div class="legend"><span class="swatch"></span> Noch offen</div><div class="legend"><span class="swatch done"></span> Schon dort gewesen</div>
+  </section>
+  <section class="section">
+    <h2>Block suchen</h2>
+    <input id="search" type="text" placeholder="z. B. Block 12, 8">
+    <p class="hint">Format: Spalte, Zeile (z. B. 12, 8). Die Nummer im Kästchen läuft von links nach rechts und dann zeilenweise weiter.</p>
+    <div class="controls"><button id="find">Finden</button><button id="clearSearch">Leeren</button></div>
+  </section>
+  <section class="section">
+    <h2>Aktionen</h2>
+    <div class="controls"><button id="markAll">Alle abhaken</button><button id="unmarkAll">Alles leeren</button></div>
+    <p class="hint">Klicke ein Kästchen auf der Karte, um es als besucht/offen umzuschalten. Der Fortschritt wird automatisch in diesem Browser gespeichert. Hinweis: Gemeinsame Live-Synchronisierung zwischen verschiedenen Geräten braucht zusätzlich eine Online-Datenbank.</p>
+  </section>
+</aside>
+<section class="map-area">
+  <div class="map-toolbar"><div><strong>Kartenansicht</strong><br><small>Zoomen: Mausrad oder + / − · Verschieben: ziehen</small><br><small id="syncStatus">Synchronisierung noch nicht eingerichtet</small></div><div class="controls"><button id="zoomOut" aria-label="Verkleinern">−</button><button id="zoomIn" aria-label="Vergrößern">+</button><button id="center">Zentrieren</button></div></div>
+  <div class="viewport" id="viewport"><div class="world" id="world"><img src="karte.png" alt="Olevia Roleplay Stadtkarte"><div class="grid" id="grid"></div></div><div class="toast">Kästchen anklicken = besucht markieren</div></div>
+</section>
+</main>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+<script>
+/*
+  FIREBASE EINRICHTEN:
+  Ersetze die Platzhalter unten durch die Konfiguration deiner Firebase-Web-App.
+  Anleitung: LESE_MICH.md
+*/
+const firebaseConfig = {
+  apiKey: "AIzaSyAdDbMl3ueCPb-jccDfNVg_lmXVDgsaau0",
+  authDomain: "olevia-routenplaner.firebaseapp.com",
+  databaseURL: "databaseURL: "https://olevia-routenplaner-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "olevia-routenplaner",
+  appId: "1:558415075953:web:0a6d19427bb3c1805119d0"
+};
+</script>
+<script>
+(() => {
+ const W=1152,H=1312, viewport=document.getElementById('viewport'), world=document.getElementById('world'), grid=document.getElementById('grid');
+ const colsInput=document.getElementById('cols'), rowsInput=document.getElementById('rows');
+ let cols=+colsInput.value, rows=+rowsInput.value, scale=.55, tx=0, ty=0, dragging=false, startX=0,startY=0,baseX=0,baseY=0;
+ let visited=new Set(JSON.parse(localStorage.getItem('oleviaVisited')||'[]'));
+ const syncStatus=document.getElementById('syncStatus');
+ const roomId=(new URLSearchParams(location.search).get('room')||'olevia-main').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,50)||'olevia-main';
+ let db=null, roomVisitedRef=null, syncReady=false, applyingRemote=false;
+ function setStatus(msg){if(syncStatus)syncStatus.textContent=msg;}
+ function initSync(){
+   const configured=firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('HIER_') &&
+     firebaseConfig.projectId && !firebaseConfig.projectId.startsWith('HIER_') &&
+     firebaseConfig.appId && !firebaseConfig.appId.startsWith('HIER_') &&
+     firebaseConfig.databaseURL && !firebaseConfig.databaseURL.startsWith('HIER_');
+   if(!configured || !window.firebase){setStatus('Lokaler Modus · Firebase noch einzurichten');return;}
+   try{
+     firebase.initializeApp(firebaseConfig);
+     db=firebase.database();
+     roomVisitedRef=db.ref('rooms/'+roomId+'/visited');
+     firebase.auth().signInAnonymously().then(()=>{
+       roomVisitedRef.on('value',snapshot=>{
+         applyingRemote=true;
+         const data=snapshot.val()||{};
+         visited=new Set(Object.keys(data).filter(k=>data[k]===true));
+         localStorage.setItem('oleviaVisited',JSON.stringify([...visited]));
+         renderGrid(); applyingRemote=false; syncReady=true;
+         setStatus('Live synchronisiert · Raum: '+roomId);
+       },err=>setStatus('Sync-Fehler: '+err.message));
+     }).catch(err=>setStatus('Anmeldung fehlgeschlagen: '+err.message));
+   }catch(e){setStatus('Firebase-Konfiguration prüfen');}
+ }
+ function shareRoom(){
+   const url=new URL(location.href);url.searchParams.set('room',roomId);
+   if(navigator.clipboard && navigator.clipboard.writeText){
+     navigator.clipboard.writeText(url.toString()).then(()=>alert('Link zum gemeinsamen Raum kopiert!')).catch(()=>prompt('Diesen Link teilen:',url.toString()));
+   }else prompt('Diesen Link teilen:',url.toString());
+ }
+ const key=(c,r)=>`${c},${r}`;
+ function save(){localStorage.setItem('oleviaVisited',JSON.stringify([...visited]));}
+ function persistCell(k,isDone){
+   if(syncReady && roomVisitedRef && !applyingRemote){
+     roomVisitedRef.child(k).set(!!isDone).catch(err=>setStatus('Speichern fehlgeschlagen: '+err.message));
+   }
+ }
+ function renderGrid(){
+   cols=+colsInput.value;rows=+rowsInput.value;
+   document.getElementById('colsVal').textContent=cols;document.getElementById('rowsVal').textContent=rows;
+   grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;grid.style.gridTemplateRows=`repeat(${rows},1fr)`;
+   grid.innerHTML='';
+   const frag=document.createDocumentFragment();
+   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+     const el=document.createElement('button');el.type='button';el.className='cell'+(visited.has(key(c,r))?' done':'');
+     el.textContent=String(r*cols+c+1);el.title=`Block ${r*cols+c+1} (Spalte ${c+1}, Zeile ${r+1}) · ${visited.has(key(c,r))?'besucht':'offen'}`;
+     el.setAttribute('aria-label',el.title);el.dataset.c=c;el.dataset.r=r;
+     el.addEventListener('click',()=>{const k=key(c,r);visited.has(k)?visited.delete(k):visited.add(k);el.classList.toggle('done',visited.has(k));el.title=`Block ${r*cols+c+1} (Spalte ${c+1}, Zeile ${r+1}) · ${visited.has(k)?'besucht':'offen'}`;save();persistCell(k,visited.has(k));updateStats();});
+     frag.appendChild(el);
+   }
+   grid.appendChild(frag);updateStats();
+ }
+ function updateStats(){const total=cols*rows,done=[...visited].filter(k=>{const [c,r]=k.split(',').map(Number);return c<cols&&r<rows;}).length,pct=Math.round(done/total*100);document.getElementById('visited').textContent=done;document.getElementById('total').textContent=total;document.getElementById('percent').textContent=`${pct} % erledigt`;document.getElementById('progressBar').style.width=pct+'%';}
+ function apply(){world.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;}
+ function fit(){const vw=viewport.clientWidth,vh=viewport.clientHeight;scale=Math.min(vw/W,vh/H)*.96;tx=(vw-W*scale)/2;ty=(vh-H*scale)/2;apply();}
+ function zoom(f,cx=viewport.clientWidth/2,cy=viewport.clientHeight/2){const old=scale;scale=Math.max(.18,Math.min(3.5,scale*f));tx=cx-(cx-tx)*(scale/old);ty=cy-(cy-ty)*(scale/old);apply();}
+ colsInput.addEventListener('input',renderGrid);rowsInput.addEventListener('input',renderGrid);
+ document.getElementById('zoomIn').onclick=()=>zoom(1.2);document.getElementById('zoomOut').onclick=()=>zoom(1/1.2);
+ document.getElementById('center').onclick=fit;document.getElementById('resetView').onclick=fit;
+ viewport.addEventListener('wheel',e=>{e.preventDefault();const rect=viewport.getBoundingClientRect();zoom(e.deltaY<0?1.12:1/1.12,e.clientX-rect.left,e.clientY-rect.top);},{passive:false});
+ viewport.addEventListener('pointerdown',e=>{if(e.target.classList.contains('cell'))return;dragging=true;viewport.classList.add('dragging');viewport.setPointerCapture(e.pointerId);startX=e.clientX;startY=e.clientY;baseX=tx;baseY=ty;});
+ viewport.addEventListener('pointermove',e=>{if(!dragging)return;tx=baseX+e.clientX-startX;ty=baseY+e.clientY-startY;apply();});
+ function stop(){dragging=false;viewport.classList.remove('dragging')}viewport.addEventListener('pointerup',stop);viewport.addEventListener('pointercancel',stop);
+ document.getElementById('markAll').onclick=()=>{for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){visited.add(key(c,r));persistCell(key(c,r),true);}save();renderGrid();};
+ document.getElementById('unmarkAll').onclick=()=>{if(confirm('Wirklich alle Markierungen löschen?')){const old=[...visited];visited.clear();old.forEach(k=>persistCell(k,false));save();renderGrid();}};
+ document.getElementById('export').onclick=()=>{const data={app:'Olevia Roleplay Routenplaner',cols,rows,visited:[...visited],exportiert:new Date().toISOString()};const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='olevia-fortschritt.json';a.click();URL.revokeObjectURL(a.href);};
+ document.getElementById('find').onclick=()=>{const m=document.getElementById('search').value.match(/^\s*(\d+)\s*,\s*(\d+)\s*$/);if(!m){alert('Bitte Spalte, Zeile eingeben, z. B. 12, 8.');return;}const c=+m[1]-1,r=+m[2]-1;if(c<0||c>=cols||r<0||r>=rows){alert(`Bitte eine Spalte von 1–${cols} und Zeile von 1–${rows} eingeben.`);return;}const cx=(c+.5)*W/cols,cy=(r+.5)*H/rows;scale=Math.max(scale,Math.min(1.8,Math.max(viewport.clientWidth/W,viewport.clientHeight/H)*1.5));tx=viewport.clientWidth/2-cx*scale;ty=viewport.clientHeight/2-cy*scale;apply();const el=grid.children[r*cols+c];el.animate([{outline:'3px solid #fff'},{outline:'0 solid transparent'}],{duration:1000});};
+ document.getElementById('clearSearch').onclick=()=>document.getElementById('search').value='';
+ const shareBtn=document.createElement('button');shareBtn.textContent='Gemeinsamen Link kopieren';shareBtn.onclick=shareRoom;document.querySelector('header .controls').prepend(shareBtn);
+ renderGrid();initSync();requestAnimationFrame(fit);window.addEventListener('resize',()=>{if(!dragging)fit();});
+})();
+</script>
+</body>
+</html>
